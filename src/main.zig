@@ -1,24 +1,31 @@
 const std = @import("std");
+const net = std.net;
+const print = std.debug.print;
+
+const PORT = 1234;
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+    const loopback = try net.Ip4Address.parse("127.0.0.1", PORT);
+    const localhost = net.Address{ .in = loopback };
+    var server = try localhost.listen(.{
+        .reuse_address = true,
+    });
+    defer server.deinit();
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    const addr = server.listen_address;
+    print("Listening on {}, access this port to end the program\n", .{addr.getPort()});
 
-    try bw.flush(); // don't forget to flush!
-}
+    var client = try server.accept();
+    defer client.stream.close();
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+    print("Connection received! {} is sending data.\n", .{client.address});
+
+    const message = try client.stream.reader().readAllAlloc(allocator, 1024);
+    defer allocator.free(message);
+
+    print("{} says {s}\n", .{ client.address, message });
 }
