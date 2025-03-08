@@ -32,5 +32,5 @@ pub fn main() !void {
     const message_len: usize = try client.stream.reader().readAll(&buffer);
     const request: HttpRequest = try http_request.parseMessage(buffer, message_len);
 
-    print("Request: {}", .{request});
+    print("Request method: {}, request path: {s}", .{ request.method, request.path });
 }
