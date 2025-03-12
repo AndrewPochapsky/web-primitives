@@ -13,6 +13,12 @@ pub const Method = enum {
 pub const Request = struct {
     method: Method,
     path: []const u8,
+    headers: std.StringHashMap([]const u8),
+    body: []const u8,
+
+    pub fn deinit(self: *@This()) void {
+        self.headers.deinit();
+    }
 };
 
 const RequestParser = struct {
@@ -20,14 +26,21 @@ const RequestParser = struct {
     message: [MAX_MESSAGE_SIZE]u8,
     message_len: usize,
 
-    fn parse(self: *@This()) Error!Request {
+    fn parse(self: *@This(), allocator: std.mem.Allocator) !Request {
         const method = try self.parseMethod();
         const path = try self.parsePath();
         const version = try self.parseVersion();
-        if (!bytesEql(version, "HTTP/1.1")) {
+        if (!bytesEql(version, "HTTP/1.1\r")) {
             return Error.UnsupportedVersion;
         }
-        return Request{ .method = method, .path = path };
+        const headers = try self.parseHeaders(allocator);
+        const body = self.message[self.index..self.message_len];
+        return Request{
+            .method = method,
+            .path = path,
+            .headers = headers,
+            .body = body,
+        };
     }
 
     fn parseMethod(self: *@This()) Error!Method {
@@ -55,6 +68,19 @@ const RequestParser = struct {
         return self.message[self.index - 1];
     }
 
+    fn parseHeaders(self: *@This(), allocator: std.mem.Allocator) !std.StringHashMap([]const u8) {
+        var headers = std.StringHashMap([]const u8).init(allocator);
+        while (self.message[self.index] != '\r') {
+            const key = try self.readBytesUntilDelim(':');
+            if (self.message[self.index] == ' ') {
+                self.index += 1;
+            }
+            const value = try self.readBytesUntilDelim('\n');
+            try headers.put(key, value);
+        }
+        return headers;
+    }
+
     fn readBytes(self: *@This(), num: usize) []const u8 {
         const slice = self.message[self.index .. self.index + num];
         self.index += num;
@@ -80,7 +106,7 @@ fn bytesEql(bytes: []const u8, other: []const u8) bool {
     return std.mem.eql(u8, bytes, other);
 }
 
-pub fn parseMessage(message: [MAX_MESSAGE_SIZE]u8, message_len: usize) Error!Request {
+pub fn parseMessage(allocator: std.mem.Allocator, message: [MAX_MESSAGE_SIZE]u8, message_len: usize) !Request {
     var parser: RequestParser = .{ .index = 0, .message = message, .message_len = message_len };
-    return try parser.parse();
+    return try parser.parse(allocator);
 }
