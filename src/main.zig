@@ -5,6 +5,7 @@ const print = std.debug.print;
 const http_request = @import("http/request.zig");
 const HttpRequest = http_request.Request;
 const Method = http_request.Method;
+const handler = @import("http/handler.zig");
 
 const PORT = 1234;
 
@@ -38,8 +39,10 @@ pub fn main() !void {
     while (it.next()) |entry| {
         print("{s}: {s}\n", .{ entry.key_ptr.*, entry.value_ptr.* });
     }
+    const return_message = try handler.handleRequest(allocator, request);
+    defer allocator.free(return_message);
 
-    const return_message = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: 55\r\n\r\n<!DOCTYPE html>\r\n<html><body>Hi</body></html>\r\n";
+    //const return_message = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: 55\r\n\r\n<!DOCTYPE html>\r\n<html><body>Hi</body></html>\r\n";
     _ = try client.stream.writer().writeAll(return_message);
     print("Wrote response.\n", .{});
     print("body: {s}\n", .{request.body});
