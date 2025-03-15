@@ -8,8 +8,8 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var server = try Server.init(PORT);
-    defer server.deinit();
+    var server = try Server.init(allocator, PORT);
+    defer server.deinit(allocator);
 
     try server.start(allocator);
 }
