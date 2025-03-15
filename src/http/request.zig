@@ -52,6 +52,7 @@ const RequestParser = struct {
         } else if (bytesEql(bytes, "HEAD")) {
             return Method.Head;
         }
+        std.debug.print("UnknownMethod: {s}\n", .{bytes});
         return Error.UnknownMethod;
     }
 

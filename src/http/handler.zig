@@ -10,7 +10,11 @@ pub fn handleRequest(allocator: std.mem.Allocator, req: Request) ![]u8 {
         Method.Get => {
             const file_path = try std.fmt.allocPrint(allocator, "src/app{s}", .{req.path});
             defer allocator.free(file_path);
-            const file_contents = try readFile(file_path);
+            const file_contents = readFile(file_path) catch |err| {
+                std.debug.print("Error getting file: {s}, {}\n", .{ file_path, err });
+                return "";
+            };
+            defer file_contents.deinit();
             const content_length = file_contents.items.len;
             const return_message = try std.fmt.allocPrint(allocator, RESPONSE_TEMPLATE, .{ content_length, file_contents.items });
             return return_message;
