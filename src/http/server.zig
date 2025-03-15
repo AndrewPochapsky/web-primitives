@@ -4,6 +4,7 @@ const print = std.debug.print;
 
 const http_request = @import("request.zig");
 const handler = @import("handler.zig");
+const Response = handler.Response;
 
 pub const Server = struct {
     server: net.Server,
@@ -38,11 +39,11 @@ pub const Server = struct {
         var request_result = http_request.parseMessage(allocator, buffer, message_len);
         if (request_result) |*request| {
             defer request.deinit();
+            print("Parsed request: {} {s}\n", .{ request.method, request.path });
+            const return_response: Response = try handler.handleRequest(allocator, request.*);
+            defer return_response.deinit(allocator);
 
-            const return_message = try handler.handleRequest(allocator, request.*);
-            defer allocator.free(return_message);
-
-            _ = try client.stream.writer().writeAll(return_message);
+            _ = try client.stream.writer().writeAll(return_response.getData());
         } else |err| {
             print("Error parsing request {}\n", .{err});
         }
