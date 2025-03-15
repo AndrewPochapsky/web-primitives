@@ -3,8 +3,6 @@ const net = std.net;
 const print = std.debug.print;
 
 const http_request = @import("request.zig");
-const HttpRequest = http_request.Request;
-const Method = http_request.Method;
 const handler = @import("handler.zig");
 
 pub const Server = struct {
