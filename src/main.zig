@@ -1,5 +1,5 @@
 const std = @import("std");
-const s = @import("http/server.zig");
+const Server = @import("http/server.zig").Server;
 
 const PORT = 1234;
 
@@ -8,7 +8,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var server = try s.init(PORT);
+    var server = try Server.init(PORT);
     defer server.deinit();
 
     try server.start(allocator);

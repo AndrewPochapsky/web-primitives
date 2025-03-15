@@ -8,6 +8,15 @@ const handler = @import("handler.zig");
 pub const Server = struct {
     server: net.Server,
 
+    pub fn init(port: u16) !@This() {
+        const loopback = try net.Ip4Address.parse("127.0.0.1", port);
+        const localhost = net.Address{ .in = loopback };
+        const server = try localhost.listen(.{
+            .reuse_address = true,
+        });
+        return .{ .server = server };
+    }
+
     pub fn start(self: *@This(), allocator: std.mem.Allocator) !void {
         print("Listening on {}, access this port to end the program\n", .{self.server.listen_address.getPort()});
         while (true) {
@@ -39,12 +48,3 @@ pub const Server = struct {
         }
     }
 };
-
-pub fn init(port: u16) !Server {
-    const loopback = try net.Ip4Address.parse("127.0.0.1", port);
-    const localhost = net.Address{ .in = loopback };
-    const server = try localhost.listen(.{
-        .reuse_address = true,
-    });
-    return .{ .server = server };
-}
