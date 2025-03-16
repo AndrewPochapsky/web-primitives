@@ -19,14 +19,16 @@ pub const Server = struct {
             .reuse_address = true,
         });
         const pool: *Pool = try allocator.create(Pool);
-        try Pool.init(pool, .{ .n_jobs = 16, .allocator = allocator });
+        try Pool.init(pool, .{ .n_jobs = 64, .allocator = allocator });
         return .{ .server = server, .pool = pool, .handler = handler_impl };
     }
 
     pub fn start(self: *@This(), allocator: std.mem.Allocator) !void {
         print("Listening on {}, access this port to end the program\n", .{self.server.listen_address.getPort()});
         while (true) {
-            try self.pool.spawn(handleRequest, .{ self, allocator });
+            const connection: net.Server.Connection = try self.server.accept();
+            print("{d}: Spawning thread\n", .{std.time.timestamp()});
+            try self.pool.spawn(handleRequest, .{ self, allocator, connection });
         }
     }
 
@@ -36,16 +38,12 @@ pub const Server = struct {
         allocator.destroy(self.pool);
     }
 
-    fn handleRequest(self: *@This(), allocator: std.mem.Allocator) void {
-        var client: net.Server.Connection = self.server.accept() catch |err| {
-            print("Error accepting request: {}\n", .{err});
-            return;
-        };
-        defer client.stream.close();
+    fn handleRequest(self: *@This(), allocator: std.mem.Allocator, connection: net.Server.Connection) void {
+        defer connection.stream.close();
 
-        print("Connection received! {} is sending data.\n", .{client.address});
+        print("Connection received! {} is sending data.\n", .{connection.address});
         var buffer = std.mem.zeroes([http_request.MAX_MESSAGE_SIZE]u8);
-        const message_len: usize = client.stream.reader().read(&buffer) catch |err| {
+        const message_len: usize = connection.stream.reader().read(&buffer) catch |err| {
             print("Error reading request data: {}\n", .{err});
             return;
         };
@@ -59,7 +57,7 @@ pub const Server = struct {
             };
             defer return_response.deinit(allocator);
 
-            _ = client.stream.writer().writeAll(return_response.getData()) catch |err| {
+            _ = connection.stream.writer().writeAll(return_response.getData()) catch |err| {
                 print("Error writingr response: {}\n", .{err});
             };
         } else |err| {
