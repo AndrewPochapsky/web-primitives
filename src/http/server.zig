@@ -4,14 +4,15 @@ const print = std.debug.print;
 const Pool = std.Thread.Pool;
 
 const http_request = @import("request.zig");
-const handler = @import("handler.zig");
+const handler = @import("handler/handler.zig");
 const Response = handler.Response;
 
 pub const Server = struct {
     server: net.Server,
     pool: *Pool,
+    handler: handler.Handler,
 
-    pub fn init(allocator: std.mem.Allocator, port: u16) !@This() {
+    pub fn init(allocator: std.mem.Allocator, port: u16, handler_impl: handler.Handler) !@This() {
         const loopback = try net.Ip4Address.parse("127.0.0.1", port);
         const localhost = net.Address{ .in = loopback };
         const server = try localhost.listen(.{
@@ -19,7 +20,7 @@ pub const Server = struct {
         });
         const pool: *Pool = try allocator.create(Pool);
         try Pool.init(pool, .{ .n_jobs = 16, .allocator = allocator });
-        return .{ .server = server, .pool = pool };
+        return .{ .server = server, .pool = pool, .handler = handler_impl };
     }
 
     pub fn start(self: *@This(), allocator: std.mem.Allocator) !void {
@@ -52,7 +53,7 @@ pub const Server = struct {
         if (request_result) |*request| {
             defer request.deinit();
             print("Parsed request: {} {s}\n", .{ request.method, request.path });
-            const return_response: Response = handler.handleRequest(allocator, request.*) catch |err| {
+            const return_response: Response = self.handler.handle(allocator, request.*) catch |err| {
                 print("Error handling request: {}\n", .{err});
                 return;
             };
