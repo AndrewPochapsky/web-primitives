@@ -5,7 +5,7 @@ const Pool = std.Thread.Pool;
 
 const http_request = @import("request.zig");
 const handler = @import("handler/handler.zig");
-const Response = handler.Response;
+const Response = @import("response.zig").Response;
 
 pub const Server = struct {
     server: net.Server,
@@ -51,13 +51,13 @@ pub const Server = struct {
         if (request_result) |*request| {
             defer request.deinit();
             print("Parsed request: {} {s}\n", .{ request.method, request.path });
-            const return_response: Response = self.handler.handle(allocator, request.*) catch |err| {
+            var return_response: Response = self.handler.handle(allocator, request.*) catch |err| {
                 print("Error handling request: {}\n", .{err});
                 return;
             };
             defer return_response.deinit(allocator);
 
-            _ = connection.stream.writer().writeAll(return_response.getData()) catch |err| {
+            return_response.write(allocator, connection.stream.writer()) catch |err| {
                 print("Error writingr response: {}\n", .{err});
             };
         } else |err| {
